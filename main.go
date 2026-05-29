@@ -82,6 +82,11 @@ func setupProc(newroot string) {
 		fmt.Printf("Error removing putold directory: %v\n", err)
 		return
 	}
+
+	if err := syscall.Sethostname([]byte("container")); err != nil {
+		fmt.Printf("Error setting hostname: %v\n", err)
+		return
+	}
 }
 
 func rexec() {
@@ -122,16 +127,21 @@ func rexec() {
 		return
 	}
 
+	if err := os.MkdirAll("sys/fs/cgroup/mini-runc", 0755); err != nil {
+		fmt.Printf("Error creating cgroup directory: %v\n", err)
+		return
+	}
+
 	// Enable cgroup v2 controllers for the runtime/parent cgroup
 	// This must be done before actually creating the chilg cgroup
 	subtree_controll_path := filepath.Join("/sys/fs/cgroup/mini-runc", "cgroup.subtree_control")
-	if err := os.WriteFile(subtree_controll_path, []byte("+cpu +memory"), 0644); err != nil {
+	if err := os.WriteFile(subtree_controll_path, []byte("+cpu +memory"), 0755); err != nil {
 		fmt.Printf("Error writing to cgroup.subtree_control: %v\n", err)
 		return
 	}
 
 	cgroupPath := "/sys/fs/cgroup/mini-runc/test-gontainerd-" + fmt.Sprintf("%d", cmd.Process.Pid)
-	if err := os.MkdirAll(cgroupPath, 0644); err != nil {
+	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
 		fmt.Printf("Error creating cgroup directory: %v\n", err)
 		return
 	}
@@ -142,14 +152,14 @@ func rexec() {
 	hostPid := cmd.Process.Pid
 	fmt.Printf("Adding process with PID %d to cgroup\n", hostPid)
 	procPath := filepath.Join(cgroupPath, "cgroup.procs")
-	if err := os.WriteFile(procPath, []byte(fmt.Sprintf("%d", hostPid)), 0644); err != nil {
+	if err := os.WriteFile(procPath, []byte(fmt.Sprintf("%d", hostPid)), 0755); err != nil {
 		fmt.Printf("Error writing to cgroup.procs: %v\n", err)
 		return
 	}
 
 	max_mem_bytes := "100000000" // 100MB
 	memoryLimitPath := filepath.Join(cgroupPath, "memory.max")
-	if err := os.WriteFile(memoryLimitPath, []byte(max_mem_bytes), 0644); err != nil {
+	if err := os.WriteFile(memoryLimitPath, []byte(max_mem_bytes), 0755); err != nil {
 		fmt.Printf("Error writing to memory.max: %v\n", err)
 		return
 	}
