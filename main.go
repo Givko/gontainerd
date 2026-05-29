@@ -41,7 +41,7 @@ func setupProc(newroot string) {
 		return
 	}
 
-	if err := os.MkdirAll(putold, 0700); err != nil {
+	if err := os.MkdirAll(putold, 0755); err != nil {
 		fmt.Printf("Error creating putold directory: %v\n", err)
 		return
 	}
@@ -58,6 +58,10 @@ func setupProc(newroot string) {
 
 	putold = "/.pivot_root"
 
+	if err := os.MkdirAll("/proc", 0755); err != nil {
+		fmt.Printf("Error creating /proc directory: %v\n", err)
+		return
+	}
 	// Must mount proc before unmounting the old root (/.pivot_root).
 	// In a user namespace, the kernel only allows mounting procfs if it can find
 	// a proc mount from the parent namespace still visible in the current mount
@@ -110,22 +114,25 @@ func rexec() {
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 
+	//We need Start and wait and not Run()
+	// in order to setup  cgroups for the child process
 	start_err := cmd.Start()
-
 	if start_err != nil {
 		fmt.Printf("Error starting child process: %v\n", start_err)
 		return
 	}
-	cgroupPath := "/sys/fs/cgroup/mini-runc/test-gontainerd-" + fmt.Sprintf("%d", cmd.Process.Pid)
-	if err := os.MkdirAll(cgroupPath, 0644); err != nil {
-		fmt.Printf("Error creating cgroup directory: %v\n", err)
-		return
-	}
 
-	// Here we can enable cgroup v2 controller for the runtime/parent cgroup which will apply to all child cgroups
+	// Enable cgroup v2 controllers for the runtime/parent cgroup
+	// This must be done before actually creating the chilg cgroup
 	subtree_controll_path := filepath.Join("/sys/fs/cgroup/mini-runc", "cgroup.subtree_control")
 	if err := os.WriteFile(subtree_controll_path, []byte("+cpu +memory"), 0644); err != nil {
 		fmt.Printf("Error writing to cgroup.subtree_control: %v\n", err)
+		return
+	}
+
+	cgroupPath := "/sys/fs/cgroup/mini-runc/test-gontainerd-" + fmt.Sprintf("%d", cmd.Process.Pid)
+	if err := os.MkdirAll(cgroupPath, 0644); err != nil {
+		fmt.Printf("Error creating cgroup directory: %v\n", err)
 		return
 	}
 
@@ -140,7 +147,7 @@ func rexec() {
 		return
 	}
 
-	max_mem_bytes := "100000" // 10MB
+	max_mem_bytes := "100000000" // 100MB
 	memoryLimitPath := filepath.Join(cgroupPath, "memory.max")
 	if err := os.WriteFile(memoryLimitPath, []byte(max_mem_bytes), 0644); err != nil {
 		fmt.Printf("Error writing to memory.max: %v\n", err)
@@ -151,5 +158,9 @@ func rexec() {
 	fmt.Println("finished successfully")
 	if err != nil {
 		fmt.Println("Error:", err)
+	}
+	if err := os.RemoveAll(cgroupPath); err != nil {
+		fmt.Printf("Error removing cgroup directory: %v\n", err)
+		return
 	}
 }
