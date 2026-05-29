@@ -127,7 +127,7 @@ func rexec() {
 		return
 	}
 
-	if err := os.MkdirAll("sys/fs/cgroup/mini-runc", 0755); err != nil {
+	if err := os.MkdirAll("/sys/fs/cgroup/mini-runc", 0755); err != nil {
 		fmt.Printf("Error creating cgroup directory: %v\n", err)
 		return
 	}
