@@ -140,7 +140,7 @@ func rexec() {
 		return
 	}
 
-	max_mem_bytes := "100000000" // 100MB
+	max_mem_bytes := "100000" // 10MB
 	memoryLimitPath := filepath.Join(cgroupPath, "memory.max")
 	if err := os.WriteFile(memoryLimitPath, []byte(max_mem_bytes), 0644); err != nil {
 		fmt.Printf("Error writing to memory.max: %v\n", err)
